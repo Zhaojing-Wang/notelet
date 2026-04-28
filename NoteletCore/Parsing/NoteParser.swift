@@ -19,7 +19,7 @@ public struct NoteParser {
             }
             if cursor < lines.count {
                 let candidate = lines[cursor].trimmingCharacters(in: .whitespacesAndNewlines)
-                if !candidate.isEmpty {
+                if !candidate.isEmpty, !Self.isWebURL(candidate) {
                     title = stripHeadingMarkup(candidate).text
                     cursor += 1
                 }
@@ -70,6 +70,12 @@ public struct NoteParser {
 
             if trimmed.isEmpty {
                 flushInlineGroups()
+                continue
+            }
+
+            if Self.isWebURL(trimmed) {
+                flushInlineGroups()
+                blocks.append(.link(trimmed))
                 continue
             }
 
@@ -171,9 +177,15 @@ public struct NoteParser {
         return text.isEmpty ? nil : text
     }
 
+    private static func isWebURL(_ line: String) -> Bool {
+        guard let url = URL(string: line), let scheme = url.scheme?.lowercased() else {
+            return false
+        }
+        return (scheme == "http" || scheme == "https") && url.host != nil
+    }
+
     private func isDivider(_ line: String) -> Bool {
         guard line.count >= 3 else { return false }
         return line.allSatisfy { $0 == "-" || $0 == "—" || $0 == "_" }
     }
 }
-

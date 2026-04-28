@@ -30,9 +30,38 @@ public enum NoteSource: Codable, Equatable, Hashable {
     case url(String)
 }
 
+public struct NoteImageAttachment: Codable, Equatable, Hashable, Identifiable {
+    public let id: UUID
+    public var data: Data
+    public var typeIdentifier: String
+    public var pixelWidth: CGFloat
+    public var pixelHeight: CGFloat
+
+    public init(
+        id: UUID = UUID(),
+        data: Data,
+        typeIdentifier: String,
+        pixelWidth: CGFloat,
+        pixelHeight: CGFloat
+    ) {
+        self.id = id
+        self.data = data
+        self.typeIdentifier = typeIdentifier
+        self.pixelWidth = pixelWidth
+        self.pixelHeight = pixelHeight
+    }
+
+    public var aspectRatio: CGFloat {
+        guard pixelWidth > 0, pixelHeight > 0 else { return 4 / 3 }
+        return pixelWidth / pixelHeight
+    }
+}
+
 public enum NoteBlock: Codable, Equatable, Hashable, Identifiable {
     case heading(String, level: Int)
     case paragraph(String)
+    case link(String)
+    case image(NoteImageAttachment)
     case bulletList([String])
     case numberedList([String])
     case quote(String)
@@ -44,6 +73,10 @@ public enum NoteBlock: Codable, Equatable, Hashable, Identifiable {
             "heading-\(level)-\(text.hashValue)"
         case .paragraph(let text):
             "paragraph-\(text.hashValue)"
+        case .link(let url):
+            "link-\(url.hashValue)"
+        case .image(let attachment):
+            "image-\(attachment.id.uuidString)"
         case .bulletList(let items):
             "bullet-\(items.hashValue)"
         case .numberedList(let items):
@@ -138,4 +171,3 @@ public struct ExportPreset: Codable, Equatable, Hashable {
 
     public static let defaultSocial = ExportPreset(mode: .autoPages, ratio: .portrait4x5)
 }
-

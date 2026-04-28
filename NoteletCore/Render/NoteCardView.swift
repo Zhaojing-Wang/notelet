@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 public struct NoteCardView: View {
     public let document: NoteDocument
     public let template: TemplatePreset
@@ -75,6 +79,21 @@ public struct NoteCardView: View {
                 .lineSpacing(bodyLineSpacing)
                 .foregroundStyle(Color(noteletHex: template.textHex))
                 .fixedSize(horizontal: false, vertical: true)
+        case .link(let url):
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "link")
+                    .font(bodyFont.weight(.semibold))
+                    .foregroundStyle(Color(noteletHex: template.accentHex))
+                    .padding(.top, 2)
+                Text(url)
+                    .font(bodyFont)
+                    .lineSpacing(bodyLineSpacing)
+                    .foregroundStyle(Color(noteletHex: template.accentHex))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 4)
+        case .image(let attachment):
+            imageBlock(attachment)
         case .bulletList(let items):
             VStack(alignment: .leading, spacing: bodyLineSpacing) {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
@@ -124,6 +143,25 @@ public struct NoteCardView: View {
         }
     }
 
+    @ViewBuilder
+    private func imageBlock(_ attachment: NoteImageAttachment) -> some View {
+        #if canImport(UIKit)
+        if let image = UIImage(data: attachment.data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: imageHeight(for: attachment))
+                .clipShape(RoundedRectangle(cornerRadius: imageCornerRadius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: imageCornerRadius, style: .continuous)
+                        .stroke(Color(noteletHex: template.textHex).opacity(0.08), lineWidth: 1)
+                }
+                .accessibilityLabel("备忘录图片")
+        }
+        #endif
+    }
+
     private var titleFont: Font {
         .system(
             size: 48 * fontPreset.titleScale,
@@ -148,8 +186,18 @@ public struct NoteCardView: View {
         max(18, exportSize.width * 0.018)
     }
 
+    private var imageCornerRadius: CGFloat {
+        min(CGFloat(template.cornerRadius), 22)
+    }
+
     private var cardOuterPadding: CGFloat {
         exportSize.width * 0.055
+    }
+
+    private func imageHeight(for attachment: NoteImageAttachment) -> CGFloat {
+        let contentWidth = max(exportSize.width - CGFloat(template.padding * 2), 320)
+        let naturalHeight = contentWidth / max(attachment.aspectRatio, 0.2)
+        return min(max(naturalHeight, exportSize.height * 0.16), exportSize.height * 0.38)
     }
 
     private func design(from role: FontPreset.FontRole) -> Font.Design {

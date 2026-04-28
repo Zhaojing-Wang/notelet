@@ -52,4 +52,36 @@ struct PaginationEngineTests {
         #expect(pages.dropFirst().allSatisfy { $0.title == nil })
         #expect(pages.flatMap(\.blocks) == blocks)
     }
+
+    @Test func imageBlocksParticipateInPaginationAndStayInOrder() throws {
+        let image = NoteImageAttachment(
+            data: Data([0x01, 0x02, 0x03]),
+            typeIdentifier: "public.jpeg",
+            pixelWidth: 1200,
+            pixelHeight: 800
+        )
+        let blocks: [NoteBlock] = [
+            .paragraph("图片前的说明"),
+            .image(image),
+            .paragraph("图片后的说明")
+        ]
+        let document = NoteDocument(
+            title: "带图备忘录",
+            blocks: blocks,
+            source: .shareExtension,
+            createdAt: Date(timeIntervalSince1970: 0)
+        )
+
+        let pages = PaginationEngine().paginate(
+            document,
+            template: TemplateStore.builtInTemplates[0],
+            preset: .defaultSocial
+        )
+
+        #expect(pages.flatMap(\.blocks) == blocks)
+        #expect(PaginationEngine().estimatedContentHeight(
+            for: document,
+            template: TemplateStore.builtInTemplates[0]
+        ) > 500)
+    }
 }

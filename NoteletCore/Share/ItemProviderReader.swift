@@ -1,5 +1,6 @@
 import Foundation
 import UniformTypeIdentifiers
+import UIKit
 
 public enum ItemProviderReader {
     public static func document(from extensionItems: [NSExtensionItem]) async -> NoteDocument? {
@@ -11,15 +12,18 @@ public enum ItemProviderReader {
             for provider in providers where provider.hasItemConformingToTypeIdentifier(type.identifier) {
                 if let text = await loadText(from: provider, type: type), !text.isEmpty {
                     let source: NoteSource = type == .url ? .url(text) : .shareExtension
-                    return NoteParser().parse(text, source: source)
+                    var document = NoteParser().parse(text, source: source)
+                    document.blocks.append(contentsOf: await loadImages(from: providers).map(NoteBlock.image))
+                    return document
                 }
             }
         }
 
-        if providers.contains(where: { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) }) {
+        let images = await loadImages(from: providers)
+        if !images.isEmpty {
             return NoteDocument(
                 title: "图片附件",
-                blocks: [.paragraph("留笺第一版主要支持从 Apple Notes 分享文字。图片附件已收到，后续版本会增强图片导入。")],
+                blocks: images.map(NoteBlock.image),
                 source: .shareExtension
             )
         }
@@ -53,5 +57,74 @@ public enum ItemProviderReader {
             }
         }
     }
-}
 
+    private static func loadImages(from providers: [NSItemProvider]) async -> [NoteImageAttachment] {
+        var images: [NoteImageAttachment] = []
+        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+            if let image = await loadImage(from: provider) {
+                images.append(image)
+            }
+        }
+        return images
+    }
+
+    private static func loadImage(from provider: NSItemProvider) async -> NoteImageAttachment? {
+        if provider.canLoadObject(ofClass: UIImage.self),
+           let image = await loadUIImage(from: provider),
+           let attachment = makeAttachment(from: image, typeIdentifier: preferredImageType(from: provider)) {
+            return attachment
+        }
+
+        for typeIdentifier in provider.registeredTypeIdentifiers where UTType(typeIdentifier)?.conforms(to: .image) == true {
+            if let attachment = await loadImageData(from: provider, typeIdentifier: typeIdentifier) {
+                return attachment
+            }
+        }
+
+        return nil
+    }
+
+    private static func loadUIImage(from provider: NSItemProvider) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            provider.loadObject(ofClass: UIImage.self) { object, _ in
+                continuation.resume(returning: object as? UIImage)
+            }
+        }
+    }
+
+    private static func loadImageData(from provider: NSItemProvider, typeIdentifier: String) async -> NoteImageAttachment? {
+        await withCheckedContinuation { continuation in
+            provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { data, _ in
+                guard let data, let image = UIImage(data: data) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                continuation.resume(returning: NoteImageAttachment(
+                    data: data,
+                    typeIdentifier: typeIdentifier,
+                    pixelWidth: image.size.width * image.scale,
+                    pixelHeight: image.size.height * image.scale
+                ))
+            }
+        }
+    }
+
+    private static func makeAttachment(from image: UIImage, typeIdentifier: String) -> NoteImageAttachment? {
+        guard let data = image.jpegData(compressionQuality: 0.9) ?? image.pngData() else {
+            return nil
+        }
+
+        return NoteImageAttachment(
+            data: data,
+            typeIdentifier: typeIdentifier,
+            pixelWidth: image.size.width * image.scale,
+            pixelHeight: image.size.height * image.scale
+        )
+    }
+
+    private static func preferredImageType(from provider: NSItemProvider) -> String {
+        provider.registeredTypeIdentifiers.first { UTType($0)?.conforms(to: .image) == true }
+            ?? UTType.jpeg.identifier
+    }
+}

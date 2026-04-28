@@ -72,6 +72,10 @@ public struct PaginationEngine {
             return base + wrappedLineBonus(for: text, charactersPerLine: 18, lineHeight: 24) + spacing
         case .paragraph(let text):
             return 34 + wrappedLineBonus(for: text, charactersPerLine: 24, lineHeight: 26) + spacing
+        case .link(let url):
+            return 42 + wrappedLineBonus(for: url, charactersPerLine: 26, lineHeight: 24) + spacing
+        case .image(let attachment):
+            return imageHeight(for: attachment, template: template) + spacing
         case .bulletList(let items), .numberedList(let items):
             let itemHeights = items.reduce(CGFloat(0)) { partial, item in
                 partial + 28 + wrappedLineBonus(for: item, charactersPerLine: 22, lineHeight: 22)
@@ -82,6 +86,12 @@ public struct PaginationEngine {
         case .divider:
             return 38 + spacing
         }
+    }
+
+    private func imageHeight(for attachment: NoteImageAttachment, template: TemplatePreset) -> CGFloat {
+        let contentWidth = max(1080 - CGFloat(template.padding * 2), 320)
+        let naturalHeight = contentWidth / max(attachment.aspectRatio, 0.2)
+        return min(max(naturalHeight, 180), 520)
     }
 
     private func wrappedLineBonus(
@@ -95,4 +105,3 @@ public struct PaginationEngine {
         return CGFloat(max(lineCount - 1, 0)) * lineHeight
     }
 }
-

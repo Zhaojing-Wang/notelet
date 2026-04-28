@@ -32,7 +32,19 @@ struct NoteParserTests {
             .numberedList(["先做 4:5 多图", "再补长图"]),
             .quote("从 Apple Notes 分享进来，10 秒内生成漂亮图片。"),
             .divider,
-            .paragraph("https://example.com")
+            .link("https://example.com")
+        ])
+    }
+
+    @Test func parsesWebURLAsLinkWithoutPromotingItToTitle() throws {
+        let document = NoteParser().parse(
+            "https://example.com/articles/notelet",
+            source: .url("https://example.com/articles/notelet")
+        )
+
+        #expect(document.title == nil)
+        #expect(document.blocks == [
+            .link("https://example.com/articles/notelet")
         ])
     }
 
